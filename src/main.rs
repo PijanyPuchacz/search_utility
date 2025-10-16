@@ -59,6 +59,23 @@ fn main() {
 
     //dbg!(&args);
 
+    //check for help "-h" or "--help" input
+    if args[1] == "-h" || args[1] == "--help" {
+        print!(
+            "Usage: grep [OPTIONS] <pattern> <files...>
+
+        Options:
+        -i                Case-insensitive search
+        -n                Print line numbers
+        -v                Invert match (exclude lines that match the pattern)
+        -r                Recursive directory search
+        -f                Print filenames
+        -c                Enable colored output
+        -h, --help        Show help information\n"
+        );
+        return;
+    }
+
     //process input args into a config struct
     let config: Config = Config::new(&args);
 
