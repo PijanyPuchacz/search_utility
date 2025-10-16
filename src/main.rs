@@ -36,7 +36,7 @@ impl Config {
 }
 
 struct Content {
-    line_number: Option<u32>,
+    line_number: Option<usize>,
     line_string: String,
     file_path: Option<String>,
 }
@@ -57,26 +57,65 @@ fn main() {
     //get input args
     let args: Vec<String> = env::args().collect();
 
-    dbg!(&args);
+    //dbg!(&args);
 
     //process input args into a config struct
     let config: Config = Config::new(&args);
 
+    /*
     println!(
         "{:?}\n{:?}\n{:?}",
         config.search_term, config.file_paths, config.args
     );
+    */
 
-    //check that a file path was provided
-    let file_path: &String = match config.file_paths.first() {
+    //check that search term was provided
+    let search_term = match config.search_term {
+        None => panic!("No search term provided!"),
+        Some(search_term) => search_term,
+    };
+
+    //convert form String -> str, needed for later pattern matching
+    let search_term = search_term.as_str();
+
+    //check that a file path exists
+    match config.file_paths.first() {
         None => panic!("No filepath provided!"),
         Some(path) => path,
     };
 
-    let file = open_file(file_path);
+    let mut content_vec: Vec<Content> = Vec::new();
 
-    //read lines to a Bufreader
-    let file_line = io::BufReader::new(file).lines();
+    //loop through each path provided
+    for file_path in config.file_paths {
+        let file = open_file(&file_path);
+
+        //read lines to a BufReader
+        let file_lines = io::BufReader::new(file).lines();
+
+        //search file for content
+        for (line_number, line_string) in file_lines.map_while(Result::ok).enumerate() {
+            if line_string.contains(search_term) {
+                let new_content = Content {
+                    line_number: Some(line_number),
+                    line_string: line_string,
+                    file_path: Some(file_path.clone()),
+                };
+
+                content_vec.push(new_content);
+            }
+        }
+    }
+
+    //print found lines
+    for content in content_vec {
+        println!(
+            "{} | {}: {}",
+            content.file_path.unwrap(),
+            content.line_number.unwrap(),
+            content.line_string
+        );
+    }
 }
 
 fn open_file(file_path: &String) -> File {
