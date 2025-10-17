@@ -63,11 +63,15 @@ struct Content {
 }
 
 impl Content {
-    pub fn new() -> Content {
+    pub fn new(
+        line_number: Option<usize>,
+        line_string: String,
+        file_path: Option<String>,
+    ) -> Content {
         let new_content = Content {
-            line_number: None,
-            line_string: "".to_string(),
-            file_path: None,
+            line_number: line_number,
+            line_string: line_string,
+            file_path: file_path,
         };
 
         new_content
@@ -133,38 +137,65 @@ fn main() {
         let file_lines = io::BufReader::new(file).lines();
 
         //search file for content
+        for (line_number, line_string) in file_lines.map_while(Result::ok).enumerate() {
+            //check for case insensitive "-i" or inverted "-v" parameter
+            match config.args.contains(&"-i".to_string()) {
+                true => match config.args.contains(&"-v".to_string()) {
+                    true => {
+                        //case insensitive && inverted
+                        if !(line_string
+                            .to_lowercase()
+                            .contains(search_term.to_lowercase().as_str()))
+                        {
+                            let new_content: Content = Content::new(
+                                Some(line_number),
+                                line_string,
+                                Some(file_path.clone()),
+                            );
+                            content_vec.push(new_content);
+                        }
+                    }
 
-        //check for case-insensitive "-i" parameter
-        if config.args.contains(&"-i".to_string()) {
-            //case insensitive
-            for (line_number, line_string) in file_lines.map_while(Result::ok).enumerate() {
-                //check both line and search-term as lower case to remove case sensitivity
-                if line_string
-                    .to_lowercase()
-                    .contains(search_term.to_lowercase().as_str())
-                {
-                    let new_content = Content {
-                        line_number: Some(line_number),
-                        line_string: line_string,
-                        file_path: Some(file_path.clone()),
-                    };
-
-                    content_vec.push(new_content);
-                }
-            }
-        } else {
-            //case sensitive
-            for (line_number, line_string) in file_lines.map_while(Result::ok).enumerate() {
-                if line_string.contains(search_term) {
-                    let new_content = Content {
-                        line_number: Some(line_number),
-                        line_string: line_string,
-                        file_path: Some(file_path.clone()),
-                    };
-
-                    content_vec.push(new_content);
-                }
-            }
+                    false => {
+                        //case insensitive && standard
+                        if line_string
+                            .to_lowercase()
+                            .contains(search_term.to_lowercase().as_str())
+                        {
+                            let new_content: Content = Content::new(
+                                Some(line_number),
+                                line_string,
+                                Some(file_path.clone()),
+                            );
+                            content_vec.push(new_content);
+                        }
+                    }
+                },
+                false => match config.args.contains(&"-v".to_string()) {
+                    true => {
+                        //case sensitive && inverted
+                        if !(line_string.contains(search_term)) {
+                            let new_content: Content = Content::new(
+                                Some(line_number),
+                                line_string,
+                                Some(file_path.clone()),
+                            );
+                            content_vec.push(new_content);
+                        }
+                    }
+                    false => {
+                        //case sensitive && standard
+                        if line_string.contains(search_term) {
+                            let new_content: Content = Content::new(
+                                Some(line_number),
+                                line_string,
+                                Some(file_path.clone()),
+                            );
+                            content_vec.push(new_content);
+                        }
+                    }
+                },
+            };
         }
     }
 
