@@ -43,7 +43,7 @@ impl Config {
                     //push each path to temp vector
                     match entry {
                         Ok(dir) => temp_vec.push(dir.into_path().to_str().unwrap().to_string()),
-                        Err(_) => println!("idk"),
+                        Err(_) => panic!("Error retreiving recursive file paths."),
                     }
                 }
             }
@@ -133,15 +133,37 @@ fn main() {
         let file_lines = io::BufReader::new(file).lines();
 
         //search file for content
-        for (line_number, line_string) in file_lines.map_while(Result::ok).enumerate() {
-            if line_string.contains(search_term) {
-                let new_content = Content {
-                    line_number: Some(line_number),
-                    line_string: line_string,
-                    file_path: Some(file_path.clone()),
-                };
 
-                content_vec.push(new_content);
+        //check for case-insensitive "-i" parameter
+        if config.args.contains(&"-i".to_string()) {
+            //case insensitive
+            for (line_number, line_string) in file_lines.map_while(Result::ok).enumerate() {
+                //check both line and search-term as lower case to remove case sensitivity
+                if line_string
+                    .to_lowercase()
+                    .contains(search_term.to_lowercase().as_str())
+                {
+                    let new_content = Content {
+                        line_number: Some(line_number),
+                        line_string: line_string,
+                        file_path: Some(file_path.clone()),
+                    };
+
+                    content_vec.push(new_content);
+                }
+            }
+        } else {
+            //case sensitive
+            for (line_number, line_string) in file_lines.map_while(Result::ok).enumerate() {
+                if line_string.contains(search_term) {
+                    let new_content = Content {
+                        line_number: Some(line_number),
+                        line_string: line_string,
+                        file_path: Some(file_path.clone()),
+                    };
+
+                    content_vec.push(new_content);
+                }
             }
         }
     }
@@ -149,7 +171,7 @@ fn main() {
     //print found lines
     for content in content_vec {
         println!(
-            "{} | {}: {}",
+            "{}| {}: {}",
             content.file_path.unwrap(),
             content.line_number.unwrap(),
             content.line_string
