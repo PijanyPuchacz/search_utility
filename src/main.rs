@@ -31,6 +31,27 @@ impl Config {
                 new_config.file_paths.push(arg.clone());
             }
         }
+
+        //check for passed parameter "-r"
+        if new_config.args.contains(&"-r".to_string()) {
+            let mut temp_vec: Vec<String> = Vec::new();
+
+            //use walkdir to find all filepaths needed
+            //search for recursive paths in the provided paths
+            for top_path in &new_config.file_paths {
+                for entry in WalkDir::new(top_path) {
+                    //push each path to temp vector
+                    match entry {
+                        Ok(dir) => temp_vec.push(dir.into_path().to_str().unwrap().to_string()),
+                        Err(_) => println!("idk"),
+                    }
+                }
+            }
+
+            //replace file_paths in config with all found recursive paths
+            new_config.file_paths = temp_vec;
+        }
+
         new_config
     }
 }
@@ -101,6 +122,7 @@ fn main() {
         Some(path) => path,
     };
 
+    //vector to store all found matches
     let mut content_vec: Vec<Content> = Vec::new();
 
     //loop through each path provided
