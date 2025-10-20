@@ -58,19 +58,19 @@ impl Config {
 
 struct Content {
     line_number: Option<usize>,
-    line_string: String,
+    line_vec: Vec<String>,
     file_path: Option<String>,
 }
 
 impl Content {
     pub fn new(
         line_number: Option<usize>,
-        line_string: String,
+        line_vec: Vec<String>,
         file_path: Option<String>,
     ) -> Content {
         let new_content = Content {
             line_number: line_number,
-            line_string: line_string,
+            line_vec: line_vec,
             file_path: file_path,
         };
 
@@ -87,16 +87,15 @@ fn main() {
     //check for help "-h" or "--help" input
     if args[1] == "-h" || args[1] == "--help" {
         print!(
-            "Usage: grep [OPTIONS] <pattern> <files...>
-
-        Options:
-        -i                Case-insensitive search
-        -n                Print line numbers
-        -v                Invert match (exclude lines that match the pattern)
-        -r                Recursive directory search
-        -f                Print filenames
-        -c                Enable colored output
-        -h, --help        Show help information\n"
+            "Usage: grep [OPTIONS] <pattern> <files...>\n
+Options:
+-i                Case-insensitive search
+-n                Print line numbers
+-v                Invert match (exclude lines that match the pattern)
+-r                Recursive directory search
+-f                Print filenames
+-c                Enable colored output
+-h, --help        Show help information\n"
         );
         return;
     }
@@ -137,7 +136,7 @@ fn main() {
         let file_lines = io::BufReader::new(file).lines();
 
         //search file for content
-        for (line_number, line_string) in file_lines.map_while(Result::ok).enumerate() {
+        for (line_number, mut line_string) in file_lines.map_while(Result::ok).enumerate() {
             //check for case insensitive "-i" or inverted "-v" parameter
             match config.args.contains(&"-i".to_string()) {
                 true => match config.args.contains(&"-v".to_string()) {
@@ -147,9 +146,11 @@ fn main() {
                             .to_lowercase()
                             .contains(search_term.to_lowercase().as_str()))
                         {
+                            let line_vec: Vec<String> = [line_string].to_vec();
+
                             let new_content: Content = Content::new(
-                                Some(line_number),
-                                line_string,
+                                Some(line_number + 1),
+                                line_vec,
                                 Some(file_path.clone()),
                             );
                             content_vec.push(new_content);
@@ -162,9 +163,23 @@ fn main() {
                             .to_lowercase()
                             .contains(search_term.to_lowercase().as_str())
                         {
+                            let mut line_vec: Vec<String> = Vec::new();
+
+                            //get word location in line, used if "-c" is provided later
+                            let word_location = line_string
+                                .to_lowercase()
+                                .find(search_term.to_lowercase().as_str())
+                                .unwrap();
+                            let first_split =
+                                line_string.split_off(word_location + search_term.len());
+                            let second_split = line_string.split_off(word_location);
+                            line_vec.push(line_string); //first part of line
+                            line_vec.push(second_split); //searched word here
+                            line_vec.push(first_split); //second part of line
+
                             let new_content: Content = Content::new(
-                                Some(line_number),
-                                line_string,
+                                Some(line_number + 1),
+                                line_vec,
                                 Some(file_path.clone()),
                             );
                             content_vec.push(new_content);
@@ -175,9 +190,11 @@ fn main() {
                     true => {
                         //case sensitive && inverted
                         if !(line_string.contains(search_term)) {
+                            let line_vec: Vec<String> = [line_string].to_vec();
+
                             let new_content: Content = Content::new(
-                                Some(line_number),
-                                line_string,
+                                Some(line_number + 1),
+                                line_vec,
                                 Some(file_path.clone()),
                             );
                             content_vec.push(new_content);
@@ -186,9 +203,20 @@ fn main() {
                     false => {
                         //case sensitive && standard
                         if line_string.contains(search_term) {
+                            let mut line_vec: Vec<String> = Vec::new();
+
+                            //get word location in line, used if "-c" is provided later
+                            let word_location = line_string.find(search_term).unwrap();
+                            let first_split =
+                                line_string.split_off(word_location + search_term.len());
+                            let second_split = line_string.split_off(word_location);
+                            line_vec.push(line_string); //first part of line
+                            line_vec.push(second_split); //searched word here
+                            line_vec.push(first_split); //second part of line
+
                             let new_content: Content = Content::new(
-                                Some(line_number),
-                                line_string,
+                                Some(line_number + 1),
+                                line_vec,
                                 Some(file_path.clone()),
                             );
                             content_vec.push(new_content);
@@ -201,12 +229,66 @@ fn main() {
 
     //print found lines
     for content in content_vec {
-        println!(
-            "{}| {}: {}",
-            content.file_path.unwrap(),
-            content.line_number.unwrap(),
-            content.line_string
-        );
+        match config.args.contains(&"-f".to_string()) {
+            true => match config.args.contains(&"-n".to_string()) {
+                true => {
+                    //filepath && line number
+                    print!(
+                        "{}| {}: ",
+                        content.file_path.unwrap(),
+                        content.line_number.unwrap(),
+                    );
+                    for (pos, line) in content.line_vec.iter().enumerate() {
+                        if config.args.contains(&"-c".to_string()) && pos == 1 {
+                            print!("{}", line.color("red"));
+                        } else {
+                            print!("{line}");
+                        }
+                    }
+                    print!("\n");
+                }
+                false => {
+                    //filepath
+                    print!("{}: ", content.file_path.unwrap());
+
+                    for (pos, line) in content.line_vec.iter().enumerate() {
+                        if config.args.contains(&"-c".to_string()) && pos == 1 {
+                            print!("{}", line.color("red"));
+                        } else {
+                            print!("{line}");
+                        }
+                    }
+                    print!("\n");
+                }
+            },
+            false => match config.args.contains(&"-n".to_string()) {
+                true => {
+                    //line number
+                    print!("{}: ", content.line_number.unwrap());
+
+                    for (pos, line) in content.line_vec.iter().enumerate() {
+                        if config.args.contains(&"-c".to_string()) && pos == 1 {
+                            print!("{}", line.color("red"));
+                        } else {
+                            print!("{line}");
+                        }
+                    }
+                    print!("\n");
+                }
+                false => {
+                    //no options
+
+                    for (pos, line) in content.line_vec.iter().enumerate() {
+                        if config.args.contains(&"-c".to_string()) && pos == 1 {
+                            print!("{}", line.color("red"));
+                        } else {
+                            print!("{line}");
+                        }
+                    }
+                    print!("\n");
+                }
+            },
+        };
     }
 }
 
